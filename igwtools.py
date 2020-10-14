@@ -251,11 +251,12 @@ def frame_gen(**kwargs):
 
         L, H = read_startup()
         Q = np.trapz(data[:, 0], z[:, 0])
-
+	
+	
         for i in range(np.shape(x)[1]):
 
             u_avg = Q/(H + np.min(z[:, i]))
-            data = data[i, :] - u_avg
+            data[:,i] = data[:,i] - u_avg
 
     plotargs = cleanopts(kwargs)
     pc, cb = plotsnap(data - init_data, x, z, **plotargs)
@@ -337,7 +338,8 @@ def gif(**kwargs):
     if gif_name is None:
         gif_name = 'IGW_output.gif'
 
-    imageio.mimsave(gif_name, frame_gen(**kwargs))
+    frames = frame_gen(**kwargs)
+    imageio.mimsave(gif_name,frames)
 
     ##~~Deletes the .png files that were saved since we don't need them anymore~~
     for file in glob.glob('frame*.png'):
