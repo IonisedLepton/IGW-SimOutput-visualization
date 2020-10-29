@@ -1,6 +1,26 @@
 """
-    Module igwtools
+    Module: igwtools
+
+This module contains functions that can process and produce animations or plots of the binary outputs of the IGW Simulation
+
+Functions:
+	igwread() : Reads binaries and returns np array
+	igwwrite() : Reads data and saves it in a format that igwread() can process
+	plotsnap() : Generalized plotting function for a single binary output frame 
+    slidingmean() : Computes and returns the sliding mean of a 1D array
+    slidingmean2() : Computes and returns the sliding mean of a 2D array
+    fcount() : counts and returns the number of binary frames of an output variable
+    t0() : read in the first binary file of an output variable and returns np array of the data
+    read_startup() : read the startup_graphics file and return L,H
+    frame_gen() : Generate plots of all the binary frames of an output variable
+    gif() : Produce gif of the plots of an output variable
+    times() : read the binary file containing time information and return np arrays 
+    cleanopts() : Helper function. Reformat a dictionary containing information about the plots to produce 
+
+This module is mainly used in:
+    interactive.py
 """
+
 import matplotlib.pyplot as plt
 import numpy as np
 import glob
@@ -25,7 +45,19 @@ def igwread(filename, seq=None):
     of a loop, by using the two parameter form:
           D = igwread('bin_D',5)
       px,pz = igwread('bin_pressure',9)
+
+
+      Parameters:
+        filename: str
+            binary file name, such as 'U35' or just the output variable such as, 'U'.
+        
+        seq: int
+            Frame number of the binary file to be read such as 35. Only required if output variable passed to filename
+
+     Returns:
+        numpy.array, tuple of numpy.array
     """
+
     # Filename
     path = ""
     if seq is None: fname = filename
@@ -63,6 +95,14 @@ def igwwrite(fname,data):
     """
     Writes out an array in the same format as igw
     such that we can load it later with igwread()
+
+    Parameters:
+        fname: str
+        Save name of file
+
+        data: np.array
+        data to be saved
+
     """
     with open(fname,'wb') as f:
         for ii in range(data.shape[1]):
@@ -75,6 +115,20 @@ def plotsnap(data, x, z, plot_name=None, units=('km','km'), clim=None, xlim=None
     It creates a pseudocolour plot of data
     units for (x,z) can be 'm' or 'km', we don't handle any other values
     xlim and zlim are consistent with units specified
+
+    Main Parameters:
+        data: np.array
+        array containing the data to be plotted
+
+        x: 1D numpy.array
+        array containing x-axis values
+
+        z: 1D numpy.array
+        array containing z-axis values
+
+    Return:
+        pc,cb
+        matplotlib handles for further tweaking of the plots
     """
     # Check units
     if units[0] == 'km': x /= 1000
@@ -144,6 +198,20 @@ def slidingmean(t,d,w):
     """
     Sliding mean, computed as:  sm(t) = (1/w) * \int_{t-w}^{t} d(t') dt'
     - t and d should be length N vectors, w is the averaging window width
+
+
+    Parameters:
+        t: array
+        axis array
+
+        d: array
+        data array
+
+        w: float
+        weight
+
+    Returns:
+        slidingmean
     """
     from slidingmean_c import slidingmean_c as smean
     tt, dd = t.copy(), d.copy()  # Interfacing with C routines requires care...
@@ -156,6 +224,19 @@ def slidingmean2(t,d,w):
     That is, input d has dimensions MxN
              input t has dimensions N
              output  has dimensions MxN
+
+    Parameters:
+        t: array
+        axis array
+
+        d: array
+        data array
+
+        w: float
+        weight
+
+    Returns:
+        slidingmean
     """
     from slidingmean_c import slidingmean_c as smean
     tt, dd = t.copy(), d.copy()  # Interfacing with C routines requires care...
@@ -169,6 +250,13 @@ def fcount(var):
     """
     Function that counts all of the binary data files associated
             with the input variable in the current working directory.
+
+    Parameters:
+        var: str
+        output variable name, such as 'U'
+
+    Returns:
+    count of the number of files in the directory
     """
     path = ""
     if not os.path.isfile("bin_vgrid"):
@@ -186,9 +274,20 @@ def fcount(var):
 
 def t0(var, start=None):
     """
-    Function that takes variable to be plotted as input as sngle character string,
-            e.g. 'U' or 'D', and calls igwread() to return the data for that variable
-            at the initial time (i.e. it reads bin_var0).
+    Reads the first binary file of an output variable
+
+    Parameters:
+    var: str
+        The output variable whose binary is to be read, such as 'U'
+    start: int, Optional
+        If a different frame is to be read, then the index of that frame
+
+    Returns:
+        np.array
+        The inputted binary data of the file
+
+    Main Dependencies:
+    igwread()
     """
     if start is None: start = 0
     else: start = start
@@ -199,7 +298,12 @@ def t0(var, start=None):
     return data
 
 def read_startup():
+    """
+    Read the startup_graphics file
 
+    Returns
+        L,H
+    """
     path = ""
     if not os.path.isfile("startup_graphics"):
 
@@ -218,11 +322,46 @@ def read_startup():
     return  L, H
 
 def frame_gen(**kwargs):
+    """
+    Generate an array of snapshots of the different frames(binaries) of an output variable. Helper function
 
+    Output Variables currently supported:
+    U
+    V
+    W
+    pressure (for pressure, the user needs to input either 'pressurex' or 'pressurez' in the kwargs dict to specify x or z gradient)
+    D
+    Used in:
+        gif()
+
+    Main Dependencies:
+        plotsnap()
+        igwread()
+        t0()
+        read_startup()
+        times()
+
+    Parameters:
+        kwargs: dict
+            dictionary of specifications of the plots to be produced
+
+    Returns:
+        np.array
+            array of objects returned by imageio.imread(). Each element in the array corresponding to one frame
+    """
     frames = []
     time, dt = times()
 
     var = kwargs['var']
+    
+    # bin_pressure contains both x and z gradient data.
+    if 'pressure' in var:
+        if var[-1] is 'x':
+            axis = 0 
+        elif var[-1] is 'z':
+            axis =1
+        var=var[:-1]
+
     varfile = 'bin_' + var
     start = kwargs['start']
     end = kwargs['end']
@@ -258,6 +397,25 @@ def frame_gen(**kwargs):
             u_avg = Q/(H + np.min(z[:, i]))
             data[:,i] = data[:,i] - u_avg
 
+    elif var == 'V':
+        
+        L, H = read_startup()
+        Q = np.trapz(data[:, 0], z[:, 0])
+	
+	
+        for i in range(np.shape(x)[1]):
+
+            v_avg = Q/(H + np.min(z[:, i]))
+            data[:,i] = data[:,i] - v_avg
+    
+    elif var =='pressure':
+
+        data = init_data[axis]
+        clim1 = max(data.flatten())
+        clim2 = min(data.flatten())
+        kwargs['clim'] = (clim2,clim1)
+        init_data = 0*data
+    
     plotargs = cleanopts(kwargs)
     pc, cb = plotsnap(data - init_data, x, z, **plotargs)
 
@@ -270,8 +428,12 @@ def frame_gen(**kwargs):
     print('frame0.png')
     frames.append(imageio.imread('frame0.png'))
     for i in range(start + 1, nframes):
+       
+        if var != 'pressure':
+            data = igwread(varfile, i) - init_data
+        else:
+            data = igwread(varfile,i)[axis] - init_data[axis]
 
-        data = igwread(varfile, i) - init_data
         fname = 'frame' + str(i) + '.png'
 
         if plot_type == "pcolormesh":
@@ -290,7 +452,6 @@ def frame_gen(**kwargs):
 
                 ax = plt.gca()
                 ax.collections.pop()
-                # pc, cb = plotsnap(data, x, z, **plotargs)
                 pc = plt.contourf(x, z, data, N, cmap='jet')
 
             elif plot_type == "contour":
@@ -333,7 +494,19 @@ def frame_gen(**kwargs):
     return np.array(frames)
 
 def gif(**kwargs):
+    """
+    Create gif of snapshots of an output variable.Saves the gif in the directory of this module. Helper function
+    Used in:
+        interactive.interactive()
 
+    Main Dependencies:
+        frame_gen()
+
+    Parameters:
+        kwargs: dict
+            dictionary of specifications of the plots to be produced
+    
+    """
     gif_name = kwargs['gif_name']
     if gif_name is None:
         gif_name = 'IGW_output.gif'
@@ -346,6 +519,13 @@ def gif(**kwargs):
         os.remove(file)
 
 def times():
+    """
+    Read the binaries containing the time information for each frame
+
+    Returns:
+        t,dt
+        np.arrays containing t,dt information
+    """
 
     path = ""
     if not os.path.isfile("time0"):
@@ -376,7 +556,7 @@ def times():
 
 def cleanopts(opts):
     """
-    Generates a copy of dict opts that only has parameters that plotsnap() accepts
+    Generates a copy of dict opts that only has parameters that plotsnap() accepts. Helper function
     """
     opts2 = opts.copy()
     delkeys = []
