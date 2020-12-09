@@ -394,7 +394,7 @@ def frame_gen(**kwargs):
 	
         for i in range(np.shape(x)[1]):
 
-            u_avg = Q/(H + np.min(z[:, i]))
+            u_avg = Q/(-np.min(z[:, i]))
             data[:,i] = data[:,i] - u_avg
 
     elif var == 'V':
@@ -405,7 +405,7 @@ def frame_gen(**kwargs):
 	
         for i in range(np.shape(x)[1]):
 
-            v_avg = Q/(H + np.min(z[:, i]))
+            v_avg = Q/(-np.min(z[:, i]))
             data[:,i] = data[:,i] - v_avg
     
     elif var =='pressure':
