@@ -120,11 +120,11 @@ def plotsnap(data, x, z, plot_name=None, units=('km','km'), clim=None, xlim=None
         data: np.array
         array containing the data to be plotted
 
-        x: 1D numpy.array
-        array containing x-axis values
+        x: 2D numpy.array
+        array containing x grid coordinates
 
-        z: 1D numpy.array
-        array containing z-axis values
+        z: 2D numpy.array
+        array containing z grid coordinates
 
     Return:
         pc,cb
@@ -377,7 +377,7 @@ def frame_gen(**kwargs):
     nframes = end - start
     init_data = t0(var, start=start)
 
-    data = init_data
+    data = np.copy(init_data)
     x, z = igwread('bin_vgrid')
     if var == 'D':
 
