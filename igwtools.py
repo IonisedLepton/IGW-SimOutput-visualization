@@ -388,14 +388,16 @@ def frame_gen(**kwargs):
 
     elif var == 'U':
 
-        L, H = read_startup()
-        Q = np.trapz(data[:, 0], z[:, 0])
-	
-	
-        for i in range(np.shape(x)[1]):
+        # L, H = read_startup()
+        # Q = np.trapz(data[:, 0], z[:, 0])
 
-            u_avg = Q/(-np.min(z[:, i]))
-            data[:,i] = data[:,i] - u_avg
+
+        # for i in range(np.shape(x)[1]):
+
+        #     u_avg = Q/(-np.min(z[:, i]))
+        #     data[:,i] = data[:,i] - u_avg
+        pass
+
 
     elif var == 'V':
         
@@ -417,7 +419,8 @@ def frame_gen(**kwargs):
         init_data = 0*data
     
     plotargs = cleanopts(kwargs)
-    pc, cb = plotsnap(data - init_data, x, z, **plotargs)
+    # pc, cb = plotsnap(data - init_data, x, z, **plotargs)
+    pc, cb = plotsnap(data, x, z, **plotargs)
 
     if t_units == "frames": plt.title(var + ' at T = 0000')
     elif t_units == "hh:mm:ss": plt.title(var + ' at T = 00:00:00')
@@ -430,7 +433,8 @@ def frame_gen(**kwargs):
     for i in range(start + 1, nframes):
        
         if var != 'pressure':
-            data = igwread(varfile, i) - init_data
+            # data = igwread(varfile, i) - init_data
+            data = igwread(varfile, i)
         else:
             data = igwread(varfile,i)[axis] - init_data[axis]
 
