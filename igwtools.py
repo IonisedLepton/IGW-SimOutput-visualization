@@ -189,7 +189,7 @@ def plotsnap(data, x, z, plot_name=None, units=('km','km'), clim=None, xlim=None
     plt.tight_layout(h_pad=0.0, pad=2.0)
 
     if plot_name is not None:
-        plt.savefig(plot_name, format='pdf', dpi=dpi)
+        plt.savefig(plot_name, format='png', dpi=dpi)
 
     # Return the handles for further tweaking outside of this function
     return pc, cb
