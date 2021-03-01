@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import imageio
 import glob
 import os
+import cmocean
 
 def kclim():
 
@@ -42,8 +43,9 @@ def plotsnap(x,z,data,clim,plot_type,fig=None,ax=None):
 
     xlim = (-50,200)
     zlim = (-0.2,0)
-    cmap = 'jet'
-    n_contours = 100
+    # cmap = 'jet'
+    cmap = cmocean.cm.balance
+    n_contours = 25
     
     ax.fill_between(x[0,:],np.min(z),z[0,:],facecolor='#65391a',linewidth=0.25)
 
@@ -51,12 +53,55 @@ def plotsnap(x,z,data,clim,plot_type,fig=None,ax=None):
 
     if plot_type == 'filled contour':
         cs = ax.contourf(x,z,data,levels=levels,cmap = cmap)
+        cs2 = ax.contour(cs,levels=levels,cmap=cmap)
     elif plot_type == 'contour':
         cs = ax.contour(x,z,data,levels=levels,cmap = cmap)
 
     cbar = fig.colorbar(cs)
+    if plot_type=='filled contour':
+        cbar.add_lines(cs2)
 
     return fig,ax
+
+def subtract_vertical_avg(data,var='u'):
+    
+    x,z = igwt.igwread('bin_vgrid')
+    # L, H = igwt.read_startup()
+
+    init_data = igwt.t0(var=var,start=0)
+
+    # subtract vertical average from u
+    Q = np.trapz(init_data[:,0],z[:,0])
+
+    # TODO: not incredibly efficient - optimize the code below
+    for i in range(np.shape(x)[1]):
+        u_avg = Q/(-np.min(z[:,i]))
+        data[:,i] = data[:,i] - u_avg
+    
+
+    return data
+
+    
+def single_plot(iframe):
+    var = 'U'
+    varfile = 'bin_U'
+    clim = kclim()
+    x,z = igwt.igwread('bin_vgrid')
+    plot_type = 'filled contour'
+    L, H = igwt.read_startup()
+
+    print('clim: ',clim)
+
+    data = igwt.t0(var,start=iframe)
+    #  data = subtract_vertical_avg(data,var)
+
+    fname  = 'plot_U_contourf_'+iframe+'_ncontours25_contouradded.png'
+    fig,ax = plotsnap(x,z,data,clim,plot_type)
+    fig.savefig(fname)
+
+    plt.close()
+
+
 
 def frame_gen():
     frames = []
@@ -67,13 +112,17 @@ def frame_gen():
     end = 50
     clim = kclim()
     x,z = igwt.igwread('bin_vgrid')
-    plot_type = 'contour'
+    plot_type = 'filled contour'
+    L, H = igwt.read_startup()
 
     print('clim: ',clim)
 
-    for iframe in range(0,50):
+    for iframe in range(start,end):
 
-        data = igwt.t0(var='U',start=iframe)
+        data = igwt.t0(var,start=iframe)
+        data = subtract_vertical_avg(data,var)
+
+
         fname  = 'frame'+str(iframe)+'.png'
         fig,ax = plotsnap(x,z,data,clim,plot_type)
         fig.savefig(fname)
@@ -84,7 +133,7 @@ def frame_gen():
     return np.array(frames)
                     
 def gif():
-    gif_name = 'anim_U_contour_dc.gif'
+    gif_name = 'anim_U_contourf_dc_subtractverticalavg.gif'
     frames = frame_gen()
     imageio.mimsave(gif_name,frames)
 
@@ -92,7 +141,22 @@ def gif():
         os.remove(file)
 
 
+def bgVals(i,j):
+    vals = []
+    for iframe in range(80):
+        data = igwt.t0(var='U',start=iframe)
+        vals.append(data[i,j])
+    return min(vals),max(vals)
 
-gif()
-# x,z = igwt.igwread('bin_vgrid')
-# data = igwt.t0(var='U',start=10)
+def bgValsSub(i,j):
+    vals = []
+    for iframe in range(80):
+        data = igwt.t0(var='U',start=iframe)
+        data = subtract_vertical_avg(data,'U')
+        vals.append(data[i,j])
+
+    return min(vals),max(vals)
+
+# gif()
+single_plot(iframe=25)
+
