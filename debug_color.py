@@ -8,6 +8,7 @@ import matplotlib.colors as colors
 import imageio
 import glob
 import os
+import json
 import cmocean
 
 def kclim():
@@ -43,6 +44,15 @@ def plotsnap(x,z,data,clim,plot_type,fig=None,ax=None, **kwargs):
     n_contours = kwargs.pop('n_contours', 100)
     cmap = kwargs.pop('cmap','RdBu')
 
+    if cbar_norm['norm_type'] == 'SymLogNorm':
+        linthresh = cbar_norm['linthresh']
+        linscale = cbar_norm['linscale']
+        base = cbar_norm['base']
+        cbar_norm = colors.SymLogNorm(linthresh = linthresh,
+                                    linscale = linscale,
+                                    vmin = clim[0],
+                                    vmax = clim[1],
+                                    base=base)
     if not fig or not ax:
         fig,ax = plt.subplots(figsize=(13,7))
 
@@ -64,6 +74,8 @@ def plotsnap(x,z,data,clim,plot_type,fig=None,ax=None, **kwargs):
         cs2 = ax.contour(cs,levels=levels,cmap=cmap)
     elif plot_type == 'contour':
         cs = ax.contour(x,z,data,levels=levels,cmap = cmap)
+    else:
+        raise ValueError ("Unsupported Plot Type")
 
     cbar = fig.colorbar(cs, ax=ax, extend='both')
 
@@ -166,6 +178,12 @@ def bgValsSub(i,j):
 
     return min(vals),max(vals)
 
+def logDict(dict_to_log,fpath):
+    # TODO: Modify to avoid rewriting same files
+    with open(fpath,'w') as file:
+        file.write(json.dumps(param_set))
+
+
 # gif()
 # single_plot(iframe=25)
 
@@ -175,16 +193,25 @@ test_params = [
                 'gif_name':'cmap_RdBu__cbar_linthresh0dot05_linscale1.gif',
                 'start_frame' : 0,
                 'end_frame' : 70,
-                'plot_type' : 'filled_contour',
+                'plot_type' : 'filled contour',
                 'n_contours' : 100,
                 'cmap' : 'RdBu',
-                'cbar_norm':colors.SymLogNorm(linthresh=0.05, linscale=1, vmin=clim[0], vmax=clim[1], base=10)
+                'cbar_norm':
+                            {
+                                'norm_type' : 'SymLogNorm',
+                                'linthresh' : 0.05,
+                                'linscale' : 1,
+                                'base' : 10
+                            }
+
             }
         ]
 
 
 for param_set in test_params:
     gif(**param_set)
+    logging_fpath = os.path.join(param_set['dirname'],'README.json')
+    logDict(param_set,logging_fpath)
 
 
 
