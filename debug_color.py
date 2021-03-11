@@ -4,6 +4,7 @@ Script for debugging the colorbar problem with u animations
 import igwtools as igwt
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 import imageio
 import glob
 import os
@@ -36,28 +37,36 @@ def kclim():
 
     return clim
 
-def plotsnap(x,z,data,clim,plot_type,fig=None,ax=None):
+def plotsnap(x,z,data,clim,plot_type,fig=None,ax=None, **kwargs):
+
+    cbar_norm = kwargs.pop('cbar_norm')
+    n_contours = kwargs.pop('n_contours', 100)
+    cmap = kwargs.pop('cmap','RdBu')
 
     if not fig or not ax:
         fig,ax = plt.subplots(figsize=(13,7))
 
     xlim = (-50,200)
     zlim = (-0.2,0)
-    # cmap = 'jet'
-    cmap = cmocean.cm.balance
-    n_contours = 25
+    # normalize the colorbar
+    if cbar_norm is None:
+        cbar_norm = colors.SymLogNorm(linthresh=0.05, linscale=1,
+                                    vmin=clim[0], vmax=clim[1], base=10)
     
-    ax.fill_between(x[0,:],np.min(z),z[0,:],facecolor='#65391a',linewidth=0.25)
+    ax.fill_between(x[0,:],np.min(z),z[0,:],
+                    facecolor='#65391a', linewidth=0.25)
 
     levels = np.linspace(clim[0],clim[1],n_contours)
 
     if plot_type == 'filled contour':
-        cs = ax.contourf(x,z,data,levels=levels,cmap = cmap)
+        cs = ax.contourf(x,z,data,levels=levels,
+                        cmap = cmap, norm=cbar_norm)
         cs2 = ax.contour(cs,levels=levels,cmap=cmap)
     elif plot_type == 'contour':
         cs = ax.contour(x,z,data,levels=levels,cmap = cmap)
 
-    cbar = fig.colorbar(cs)
+    cbar = fig.colorbar(cs, ax=ax, extend='both')
+
     if plot_type=='filled contour':
         cbar.add_lines(cs2)
 
@@ -98,16 +107,16 @@ def single_plot(iframe):
 
 
 
-def frame_gen():
+def frame_gen(**kwargs):
     frames = []
     time,dt = igwt.times()
     var = 'U'
     varfile = 'bin_U'
-    start = 0
-    end = 50
+    start = kwargs.pop('start_frame',0)
+    end = kwargs.pop('end_frame',50)
     clim = kclim()
     x,z = igwt.igwread('bin_vgrid')
-    plot_type = 'filled contour'
+    plot_type = kwargs.pop('plot_type', 'filled_contour')
     L, H = igwt.read_startup()
 
     print('clim: ',clim)
@@ -119,7 +128,7 @@ def frame_gen():
 
 
         fname  = 'frame'+str(iframe)+'.png'
-        fig,ax = plotsnap(x,z,data,clim,plot_type)
+        fig,ax = plotsnap(x,z,data,clim,plot_type, **kwargs)
         fig.savefig(fname)
 
         frames.append(imageio.imread(fname))
@@ -127,12 +136,17 @@ def frame_gen():
 
     return np.array(frames)
                     
-def gif():
-    gif_name = 'anim_U_contourf_dc_subtractverticalavg.gif'
-    frames = frame_gen()
+def gif(**kwargs):
+    dirname = kwargs.pop('dirname', None)
+    gif_name = kwargs.pop('gif_name', 'noname.gif')
+
+    if dirname is not None:
+        gif_name = os.path.join(dirname,gif_name)
+
+    frames = frame_gen(**kwargs)
     imageio.mimsave(gif_name,frames)
 
-    for file in glob.glob('frame*'):
+    for file in glob.glob(os.path.join(dirname,'frame*')):
         os.remove(file)
 
 
@@ -153,5 +167,24 @@ def bgValsSub(i,j):
     return min(vals),max(vals)
 
 # gif()
-single_plot(iframe=25)
+# single_plot(iframe=25)
+
+test_params = [
+            {
+                'dirname':'anims_U_contourf_dc',
+                'gif_name':'cmap_RdBu__cbar_linthresh0dot05_linscale1.gif',
+                'start_frame' : 0,
+                'end_frame' : 70,
+                'plot_type' : 'filled_contour',
+                'n_contours' : 100,
+                'cmap' : 'RdBu',
+                'cbar_norm':colors.SymLogNorm(linthresh=0.05, linscale=1, vmin=clim[0], vmax=clim[1], base=10)
+            }
+        ]
+
+
+for param_set in test_params:
+    gif(**param_set)
+
+
 
