@@ -66,19 +66,14 @@ def plotsnap(x,z,data,clim,plot_type,fig=None,ax=None):
 def subtract_vertical_avg(data,var='u'):
     
     x,z = igwt.igwread('bin_vgrid')
-    # L, H = igwt.read_startup()
-
-    init_data = igwt.t0(var=var,start=0)
-
     # subtract vertical average from u
-    Q = np.trapz(init_data[:,0],z[:,0])
+    Q = np.trapz(data[:,0],z[:,0])
 
     # TODO: not incredibly efficient - optimize the code below
     for i in range(np.shape(x)[1]):
         u_avg = Q/(-np.min(z[:,i]))
         data[:,i] = data[:,i] - u_avg
     
-
     return data
 
     
