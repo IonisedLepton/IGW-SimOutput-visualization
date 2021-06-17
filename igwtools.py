@@ -163,7 +163,9 @@ def subtract_vertical_avg(data):
     return data
 
 def plotsnap(data, x, z, plot_name=None, units=('km','km'), clim=None, xlim=None, zlim=None, colorbarticks=7,
-             cmap='seismic', grid=True, dpi=400, figsize=(6,4), plot_type='contour', contour_minmax=None, n_contours=None):
+             cmap='seismic', grid=True, dpi=400, figsize=(6,4),
+             plot_type='contour', contour_minmax=None, n_contours=None,
+             normed_cbar=False):
     """
     Generalized plotting function for IGW snapshots
     It creates a pseudocolour plot of data
@@ -229,13 +231,17 @@ def plotsnap(data, x, z, plot_name=None, units=('km','km'), clim=None, xlim=None
 
         elif plot_type == 'filled contour':
 
-            cbar_norm = colors.SymLogNorm(linthresh=0.05,
-                                          linscale=1,
-                                          vmin=clim[0],
-                                          vmax=clim[1],
-                                          base=10)
-            cs = ax.contourf(x,z,data,levels=N,
-                        cmap = cmap, norm=cbar_norm)
+            if normed_cbar is True:
+                cbar_norm = colors.SymLogNorm(linthresh=0.05,
+                                              linscale=1,
+                                              vmin=clim[0],
+                                              vmax=clim[1],
+                                              base=10)
+                cs = ax.contourf(x,z,data,levels=N,
+                            cmap = cmap, norm=cbar_norm)
+            else:
+                cs = ax.contourf(x,z,data,levels=N,
+                            cmap = cmap)
             cbar = fig.colorbar(cs, ax=ax, extend='both')
             cbar.set_ticks(np.linspace(clim[0],clim[1], colorbarticks))
 
@@ -455,6 +461,10 @@ def frame_gen(**kwargs):
 
         if kwargs['subtract_vertical_avg'] is True:
             data = subtract_vertical_avg(data)
+
+        if var == 'U' or var == 'V': plotargs['normed_cbar'] = True
+        else                       : plotargs['normed_cbar'] = False
+
 
         fname = 'frame' + str(i) + '.png'
         fig,ax = plotsnap(data,x,z,**plotargs)
