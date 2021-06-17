@@ -447,12 +447,13 @@ def frame_gen(**kwargs):
     for i in range(start, nframes):
        
         x, z = igwread('bin_vgrid')
+
         if var == 'U' or var == 'V' or var == 'D':
             data = igwread(varfile, i)
         elif var == 'pressure':
             data = igwread(varfile,i)[axis]
 
-        if var == 'U' or var == 'V':
+        if kwargs['subtract_vertical_avg'] is True:
             data = subtract_vertical_avg(data)
 
         fname = 'frame' + str(i) + '.png'
@@ -482,7 +483,6 @@ def frame_gen(**kwargs):
             l = len(str(time[-1] / 44712.0))
             plt.title(var + ' at T = {:0{width}.2f} s'.format(time[i]/ 44712.0, width=l))
 
-        # plt.savefig(fname)
         fig.savefig(fname)
         print(fname)
         frames.append(imageio.imread(fname))

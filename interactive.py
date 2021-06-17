@@ -25,6 +25,7 @@ def interactive():
 
     opts = {
         'var' : 'D',
+        'subtract_vertical_avg':True,
         'plot_name' : None,
         'units' : ('km', 'km'),
         'clim' : None,
@@ -177,6 +178,11 @@ def getnewopt(opts,key):
             if v == 'f': opts[key] = 'filled contour'
             elif v == 'c': opts[key] = 'contour'
             elif v == 'p': opts[key] = 'pcolormesh'
+
+        elif key in ['subtract_vertical_avg']:
+            v = input('(T)rue or (F)alse >')
+            if v == 'T': opts[key] = True
+            elif v == 'F': opts[key] = False
 
     except:
 
