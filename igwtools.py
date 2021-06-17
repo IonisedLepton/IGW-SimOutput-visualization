@@ -22,6 +22,7 @@ This module is mainly used in:
 """
 
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 import numpy as np
 import glob
 import os
@@ -108,6 +109,45 @@ def igwwrite(fname,data):
         for ii in range(data.shape[1]):
             f.write(data[:,ii].copy())
 
+def kclim(var,start,end):
+
+    L,H = read_startup()
+    x,z = igwread('bin_vgrid')
+    init_data = t0(var=var,start=start)
+
+    clim_min = min(init_data.flatten())
+    clim_max = max(init_data.flatten())
+
+
+    lo_list = [clim_min]
+    hi_list = [clim_max]
+
+    for frame in range(start+1,end):
+        data = t0(var=var,start=frame)
+
+        lo = min(data.flatten())
+        hi = max(data.flatten())
+        if lo < min(lo_list):
+            lo_list.append(lo)
+        if hi > max(hi_list):
+            hi_list.append(hi)
+
+    clim = (min(lo_list),max(hi_list))
+
+    return clim
+
+def subtract_vertical_avg(data):
+    """Subtract vertical average from the data"""
+    x,z = igwread('bin_vgrid') 
+    Q = np.trapz(data[:,0],z[:,0])
+
+    # TODO: not efficient loop below - use a more numpy like method
+    for i in range(np.shape(x)[1]):
+        vertical_avg = Q/(-np.min(z[:,i]))
+        data[:,i] = data[:,i] - vertical_avg
+
+    return data
+
 def plotsnap(data, x, z, plot_name=None, units=('km','km'), clim=None, xlim=None, zlim=None, colorbarticks=7,
              cmap='seismic', grid=True, dpi=400, figsize=(6,4), plot_type='contour', contour_minmax=None, n_contours=None):
     """
@@ -134,9 +174,11 @@ def plotsnap(data, x, z, plot_name=None, units=('km','km'), clim=None, xlim=None
     if units[0] == 'km': x /= 1000
     if units[1] == 'km': z /= 1000
 
+    fig,ax = plt.subplots(figsize=figsize)
+
     # Shade in topography
-    plt.fill_between(x[0, :], np.min(z), z[0, :], facecolor='#65391a', linewidth=0.25)
-    plt.grid(grid)
+    ax.fill_between(x[0, :], np.min(z), z[0, :], facecolor='#65391a', linewidth=0.25)
+    ax.grid(grid)
 
     if plot_type == 'pcolormesh':
 
@@ -149,12 +191,15 @@ def plotsnap(data, x, z, plot_name=None, units=('km','km'), clim=None, xlim=None
     else:
 
         if n_contours is None: N = 50
-        else: N = n_contours
+        else                 : N = n_contours
+
         if contour_minmax is not None:
 
             cmin = min(contour_minmax)
             cmax = max(contour_minmax)
             N = np.linspace(cmin, cmax, N)
+        else:
+            N = np.linspace(clim[0],clim[1],N)
 
         if plot_type == 'contour':
 
@@ -163,36 +208,29 @@ def plotsnap(data, x, z, plot_name=None, units=('km','km'), clim=None, xlim=None
 
         elif plot_type == 'filled contour':
 
-            pc = plt.contourf(x, z, data, N, cmap=cmap)
-            cb = plt.colorbar(format='%5.3f')
-
-    # Color scale limits
-    if clim is not None:
-        if type(clim) is not tuple:   # One value means centered about zero
-            CL, CH = -clim, clim
-        if type(clim) is tuple:
-            CL, CH = clim[0], clim[1]
-        pc.set_clim(CL,CH)
-        cb.set_clim(CL,CH)
-        cb.set_ticks(np.linspace(CL,CH, colorbarticks))
+            cbar_norm = colors.SymLogNorm(linthresh=0.05,
+                                          linscale=1,
+                                          vmin=clim[0],
+                                          vmax=clim[1],
+                                          base=10)
+            cs = ax.contourf(x,z,data,levels=N,
+                        cmap = cmap, norm=cbar_norm)
+            cbar = fig.colorbar(cs, ax=ax, extend='both')
+            cbar.set_ticks(np.linspace(clim[0],clim[1], colorbarticks))
 
     # Axis limits
-    if xlim is not None: plt.gca().set_xlim([xlim[0],xlim[1]])
-    if zlim is not None: plt.gca().set_ylim([zlim[0],zlim[1]])
+    if xlim is not None: ax.set_xlim([xlim[0],xlim[1]])
+    if zlim is not None: ax.set_ylim([zlim[0],zlim[1]])
 
     # Axis labels
-    plt.xlabel(r'$x$ ({})'.format(units[0]))
-    plt.ylabel(r'$z$ ({})'.format(units[1]))
-
-    # Figure size and output
-    plt.gcf().set_size_inches(figsize[0], figsize[1]) # set figure size here
-    plt.tight_layout(h_pad=0.0, pad=2.0)
+    ax.set_xlabel(r'$x$ ({})'.format(units[0]))
+    ax.set_ylabel(r'$z$ ({})'.format(units[1]))
 
     if plot_name is not None:
-        plt.savefig(plot_name, format='png', dpi=dpi)
+        fig.savefig(plot_name, format='png', dpi=dpi)
 
     # Return the handles for further tweaking outside of this function
-    return pc, cb
+    return fig,ax
 
 def slidingmean(t,d,w):
     """
@@ -386,30 +424,11 @@ def frame_gen(**kwargs):
         kwargs['clim'] = (clim2, clim1)
         init_data = 0 * init_data
 
-    elif var == 'U':
+    elif var == 'U' or var == 'V':
+        kwargs['clim'] = kclim(var,start,end)
+        init_data = 0 * init_data
+        data = subtract_vertical_avg(data)
 
-        # L, H = read_startup()
-        # Q = np.trapz(data[:, 0], z[:, 0])
-
-
-        # for i in range(np.shape(x)[1]):
-
-        #     u_avg = Q/(-np.min(z[:, i]))
-        #     data[:,i] = data[:,i] - u_avg
-        pass
-
-
-    elif var == 'V':
-        
-        L, H = read_startup()
-        Q = np.trapz(data[:, 0], z[:, 0])
-	
-	
-        for i in range(np.shape(x)[1]):
-
-            v_avg = Q/(-np.min(z[:, i]))
-            data[:,i] = data[:,i] - v_avg
-    
     elif var =='pressure':
 
         data = init_data[axis]
@@ -420,23 +439,29 @@ def frame_gen(**kwargs):
     
     plotargs = cleanopts(kwargs)
     # pc, cb = plotsnap(data - init_data, x, z, **plotargs)
-    pc, cb = plotsnap(data, x, z, **plotargs)
+    # pc, cb = plotsnap(data, x, z, **plotargs)
+    # fig,ax = plotsnap(data, x, z, **plotargs)
 
-    if t_units == "frames": plt.title(var + ' at T = 0000')
-    elif t_units == "hh:mm:ss": plt.title(var + ' at T = 00:00:00')
-    elif t_units == 's': plt.title(var + ' at T = 0000 s')
-    elif t_units == "tidal period": plt.title(var + ' at T = 0000')
+    # if t_units == "frames": plt.title(var + ' at T = 0000')
+    # elif t_units == "hh:mm:ss": plt.title(var + ' at T = 00:00:00')
+    # elif t_units == 's': plt.title(var + ' at T = 0000 s')
+    # elif t_units == "tidal period": plt.title(var + ' at T = 0000')
 
-    plt.savefig('frame0.png')
-    print('frame0.png')
-    frames.append(imageio.imread('frame0.png'))
-    for i in range(start + 1, nframes):
+    # fig.savefig('frame0.png')
+    # print('frame0.png')
+    # frames.append(imageio.imread('frame0.png'))
+    # for i in range(start + 1, nframes):
+    for i in range(start, nframes):
        
+        x, z = igwread('bin_vgrid')
         if var != 'pressure':
             # data = igwread(varfile, i) - init_data
             data = igwread(varfile, i)
         else:
             data = igwread(varfile,i)[axis] - init_data[axis]
+
+        if var == 'U' or var == 'V':
+            data = subtract_vertical_avg(data)
 
         fname = 'frame' + str(i) + '.png'
 
@@ -455,8 +480,9 @@ def frame_gen(**kwargs):
             if plot_type == "filled contour":
 
                 ax = plt.gca()
-                ax.collections.pop()
-                pc = plt.contourf(x, z, data, N, cmap='jet')
+                # ax.collections.pop()
+                # pc = plt.contourf(x, z, data, N, cmap='jet')
+                fig,ax = plotsnap(data, x, z, **plotargs)
 
             elif plot_type == "contour":
 
@@ -491,9 +517,11 @@ def frame_gen(**kwargs):
             l = len(str(time[-1] / 44712.0))
             plt.title(var + ' at T = {:0{width}.2f} s'.format(time[i]/ 44712.0, width=l))
 
-        plt.savefig(fname)
+        # plt.savefig(fname)
+        fig.savefig(fname)
         print(fname)
         frames.append(imageio.imread(fname))
+        plt.close()
 
     return np.array(frames)
 

@@ -39,7 +39,7 @@ def kclim():
 
 def plotsnap(x,z,data,clim,plot_type,fig=None,ax=None, **kwargs):
 
-    cbar_norm = kwargs.pop('cbar_norm')
+    cbar_norm = kwargs.pop('cbar_norm',None)
     n_contours = kwargs.pop('n_contours', 100)
     cmap = kwargs.pop('cmap','RdBu')
 
@@ -61,14 +61,15 @@ def plotsnap(x,z,data,clim,plot_type,fig=None,ax=None, **kwargs):
     if plot_type == 'filled contour':
         cs = ax.contourf(x,z,data,levels=levels,
                         cmap = cmap, norm=cbar_norm)
-        cs2 = ax.contour(cs,levels=levels,cmap=cmap)
+        # cs2 = ax.contour(cs,levels=levels,cmap=cmap)
+
     elif plot_type == 'contour':
         cs = ax.contour(x,z,data,levels=levels,cmap = cmap)
 
     cbar = fig.colorbar(cs, ax=ax, extend='both')
 
-    if plot_type=='filled contour':
-        cbar.add_lines(cs2)
+    # if plot_type=='filled contour':
+    #     cbar.add_lines(cs2)
 
     return fig,ax
 
@@ -97,9 +98,10 @@ def single_plot(iframe):
     print('clim: ',clim)
 
     data = igwt.t0(var,start=iframe)
-    #  data = subtract_vertical_avg(data,var)
+    data = subtract_vertical_avg(data,var)
 
-    fname  = 'plot_U_contourf_'+iframe+'_ncontours25_contouradded.png'
+    # fname  = 'plot_U_contourf_'+iframe+'_ncontours25_contouradded.png'
+    fname = 'plot1_dc.png'
     fig,ax = plotsnap(x,z,data,clim,plot_type)
     fig.savefig(fname)
 
@@ -116,19 +118,28 @@ def frame_gen(**kwargs):
     end = kwargs.pop('end_frame',50)
     clim = kclim()
     x,z = igwt.igwread('bin_vgrid')
-    plot_type = kwargs.pop('plot_type', 'filled_contour')
+    plot_type = kwargs.pop('plot_type', 'filled contour')
     L, H = igwt.read_startup()
 
     print('clim: ',clim)
 
     for iframe in range(start,end):
 
+        x,z = igwt.igwread('bin_vgrid')
         data = igwt.t0(var,start=iframe)
         data = subtract_vertical_avg(data,var)
 
 
         fname  = 'frame'+str(iframe)+'.png'
         fig,ax = plotsnap(x,z,data,clim,plot_type, **kwargs)
+        # fig,ax = igwt.plotsnap(data,x,z,
+        #                        clim=clim,
+        #                        plot_type='filled contour',
+        #                        figsize=(6,7),
+        #                        xlim=(-50.0,200.0),
+        #                        zlim=(-0.2,0),
+        #                        cmap='RdBu',
+        #                        )
         fig.savefig(fname)
 
         frames.append(imageio.imread(fname))
@@ -167,18 +178,18 @@ def bgValsSub(i,j):
     return min(vals),max(vals)
 
 # gif()
-# single_plot(iframe=25)
+# single_plot(iframe=5)
 
 test_params = [
             {
-                'dirname':'anims_U_contourf_dc',
-                'gif_name':'cmap_RdBu__cbar_linthresh0dot05_linscale1.gif',
+                'dirname':'',
+                'gif_name':'anim2_dc.gif',
                 'start_frame' : 0,
-                'end_frame' : 70,
-                'plot_type' : 'filled_contour',
+                'end_frame' : 20,
+                'plot_type' : 'filled contour',
                 'n_contours' : 100,
                 'cmap' : 'RdBu',
-                'cbar_norm':colors.SymLogNorm(linthresh=0.05, linscale=1, vmin=clim[0], vmax=clim[1], base=10)
+#                 'cbar_norm':colors.SymLogNorm(linthresh=0.05, linscale=1, vmin=clim[0], vmax=clim[1], base=10)
             }
         ]
 
