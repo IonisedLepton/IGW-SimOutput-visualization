@@ -113,7 +113,17 @@ def kclim(var,start,end):
 
     L,H = read_startup()
     x,z = igwread('bin_vgrid')
-    init_data = t0(var=var,start=start)
+    
+    if var in ['U','V','D']:
+        init_data = t0(var=var,start=start)
+
+    elif var in ['pressurex','pressurez']:
+        if var[-1] is 'x':
+            axis = 0 
+        elif var[-1] is 'z':
+            axis = 1
+        var=var[:-1]
+        init_data = t0(var=var,start=start)[axis]
 
     clim_min = min(init_data.flatten())
     clim_max = max(init_data.flatten())
@@ -123,7 +133,11 @@ def kclim(var,start,end):
     hi_list = [clim_max]
 
     for frame in range(start+1,end):
-        data = t0(var=var,start=frame)
+
+        if var in ['U','V','D']:
+            data = t0(var=var,start=frame)
+        elif var == 'pressure':
+            data = t0(var=var,start=frame)[axis]
 
         lo = min(data.flatten())
         hi = max(data.flatten())
@@ -183,10 +197,11 @@ def plotsnap(data, x, z, plot_name=None, units=('km','km'), clim=None, xlim=None
     if plot_type == 'pcolormesh':
 
         pc = plt.pcolormesh(x, z, data, cmap=cmap)
-        cb = plt.colorbar(format='%5.3f')
+        cbar = plt.colorbar(format='%5.3f')
         pc.set_rasterized(True)
-        cb.solids.set_edgecolor("face")
-        cb.solids.set_rasterized(True)
+        cbar.solids.set_edgecolor("face")
+        cbar.solids.set_rasterized(True)
+        # cbar.set_ticks(np.linspace(clim[0],clim[1], colorbarticks))
 
     else:
 
@@ -203,8 +218,14 @@ def plotsnap(data, x, z, plot_name=None, units=('km','km'), clim=None, xlim=None
 
         if plot_type == 'contour':
 
-            pc = plt.contour(x, z, data, N, cmap=cmap)
-            cb = plt.colorbar(format='%5.3f')
+            cs = ax.contour(x,z,data,
+                            levels=N,
+                            cmap = cmap,
+                            vmin = clim[0],
+                            vmax = clim[1])
+            # TODO: colorbar not working
+            # cbar = fig.colorbar(cs, ax=ax, extend='both')
+            # cbar.set_ticks(np.linspace(clim[0],clim[1], colorbarticks))
 
         elif plot_type == 'filled contour':
 
@@ -390,15 +411,17 @@ def frame_gen(**kwargs):
     frames = []
     time, dt = times()
 
-    var = kwargs['var']
+    _var = kwargs['var']
     
     # bin_pressure contains both x and z gradient data.
-    if 'pressure' in var:
-        if var[-1] is 'x':
+    if 'pressure' in _var:
+        if _var[-1] is 'x':
             axis = 0 
-        elif var[-1] is 'z':
+        elif _var[-1] is 'z':
             axis =1
-        var=var[:-1]
+        var = _var[:-1]
+    else:
+        var = _var
 
     varfile = 'bin_' + var
     start = kwargs['start']
@@ -412,86 +435,28 @@ def frame_gen(**kwargs):
     if end is None: end = fcount(var)
     elif end > fcount(var): end = fcount(var)
 
+    if kwargs['clim'] is None:
+        kwargs['clim'] = kclim(_var,start,end)
+    print('clim: ',kwargs['clim'])
+
     nframes = end - start
-    init_data = t0(var, start=start)
+    data = t0(var, start=start)
 
-    data = np.copy(init_data)
-    x, z = igwread('bin_vgrid')
-    if var == 'D':
-
-        clim1 = max(init_data.flatten())
-        clim2 = min(init_data.flatten())
-        kwargs['clim'] = (clim2, clim1)
-        init_data = 0 * init_data
-
-    elif var == 'U' or var == 'V':
-        kwargs['clim'] = kclim(var,start,end)
-        init_data = 0 * init_data
-        data = subtract_vertical_avg(data)
-
-    elif var =='pressure':
-
-        data = init_data[axis]
-        clim1 = max(data.flatten())
-        clim2 = min(data.flatten())
-        kwargs['clim'] = (clim2,clim1)
-        init_data = 0*data
-    
     plotargs = cleanopts(kwargs)
-    # pc, cb = plotsnap(data - init_data, x, z, **plotargs)
-    # pc, cb = plotsnap(data, x, z, **plotargs)
-    # fig,ax = plotsnap(data, x, z, **plotargs)
 
-    # if t_units == "frames": plt.title(var + ' at T = 0000')
-    # elif t_units == "hh:mm:ss": plt.title(var + ' at T = 00:00:00')
-    # elif t_units == 's': plt.title(var + ' at T = 0000 s')
-    # elif t_units == "tidal period": plt.title(var + ' at T = 0000')
-
-    # fig.savefig('frame0.png')
-    # print('frame0.png')
-    # frames.append(imageio.imread('frame0.png'))
-    # for i in range(start + 1, nframes):
     for i in range(start, nframes):
        
         x, z = igwread('bin_vgrid')
-        if var != 'pressure':
-            # data = igwread(varfile, i) - init_data
+        if var == 'U' or var == 'V' or var == 'D':
             data = igwread(varfile, i)
-        else:
-            data = igwread(varfile,i)[axis] - init_data[axis]
+        elif var == 'pressure':
+            data = igwread(varfile,i)[axis]
 
         if var == 'U' or var == 'V':
             data = subtract_vertical_avg(data)
 
         fname = 'frame' + str(i) + '.png'
-
-        if plot_type == "pcolormesh":
-
-            pc.set_array(data[:-1, :-1].ravel())
-
-        else:
-
-            if N is None: N = 50
-            if cmm is not None:
-                cmin = min(cmm)
-                cmax = max(cmm)
-                N = np.linspace(cmin, cmax, N)
-
-            if plot_type == "filled contour":
-
-                ax = plt.gca()
-                # ax.collections.pop()
-                # pc = plt.contourf(x, z, data, N, cmap='jet')
-                fig,ax = plotsnap(data, x, z, **plotargs)
-
-            elif plot_type == "contour":
-
-                ax = plt.gca()
-                ax.collections = []
-                # pc, cb = plotsnap(data, x, z, **plotargs)
-                pc = plt.contour(x, z, data, N, cmap='jet')
-
-            N = kwargs['n_contours']
+        fig,ax = plotsnap(data,x,z,**plotargs)
 
         if t_units == "frames":
 
